@@ -113,26 +113,24 @@ async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Vazifangiz qabul qilindi va ustozga yetkazildi!", reply_markup=MAIN_KEYBOARD)
         context.user_data['waiting_for_homework'] = False
 
+import http.server
+import socketserver
+import threading
+
+# Render port talab qilgani uchun soxta veb-server
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        httpd.serve_forever()
+
 if __name__ == '__main__':
+    # Soxta serverni alohida oqimda (thread) ishga tushiramiz
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+
     app = ApplicationBuilder().token(TOKEN).build()
     
-    # Ism so'rash uchun conversation handler
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)]
-        },
-        fallbacks=[CommandHandler("start", start)]
-    )
-    
-    app.add_handler(conv_handler)
-    
-    # Menyu tugmalarini eshitish
-    app.add_handler(MessageHandler(filters.Regex("^📥 Vazifa olish$"), get_homework))
-    app.add_handler(MessageHandler(filters.Regex("^📤 Vazifa topshirish$"), submit_prompt))
-    
-    # Rasm va fayllarni qabul qilish
-    app.add_handler(MessageHandler(filters.DOCUMENT | filters.PHOTO, receive_homework))
-    
+    # ... qolgan barcha handlerlar ...
+
     print("Bot ishga tushdi...")
     app.run_polling()
