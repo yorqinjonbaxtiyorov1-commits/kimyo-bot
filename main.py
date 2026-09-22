@@ -3,15 +3,21 @@ import http.server
 import socketserver
 import threading
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-# 1. Aniq tokeningiz
+# 1. Bot Token
 TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"
 
 # 2. Telegram ID raqamingiz
-ADMIN_ID = 6420660423  # O'zingizning Telegram ID'ingizni yozing
+ADMIN_ID =6420660423  # O'zingizning Telegram ID'ingizni yozing
 
-# Render portini ushlab turuvchi sodda veb-server
+# Render o'chib qolmasligi uchun soxta veb-server
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -85,7 +91,9 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.DOCUMENT | filters.PHOTO, receive_homework))
+    
+    # Xatolik shu yerda tuzatildi: filters.Document.ALL
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, receive_homework))
     
     print("Bot ishga tushdi...")
     app.run_polling()
