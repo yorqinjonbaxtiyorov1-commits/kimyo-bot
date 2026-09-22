@@ -11,13 +11,13 @@ from telegram.ext import (
     filters
 )
 
-# 1. BotFather bergan API Token
+# 1. Bot Token
 TOKEN = "8927870856:AAHICXbggtOtL_BosPINspAZaYQVCT7o3pM"
 
-# 2. Sizning shaxsiy Telegram ID'ingiz (@userinfobot orqali olgan soningiz)
-ADMIN_ID = 6420660423 # <--- Bu yerga o'zingizning Telegram ID'ingizni yozing!
+# 2. Telegram ID raqamingizni shu yerga yozing (masalan: 123456789)
+ADMIN_ID = 6420660423
 
-# Render'da Web Service o'chib qolmasligi uchun soxta server
+# Render oʻchib qolmasligi uchun soxta veb-server
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
     handler = http.server.SimpleHTTPRequestHandler
@@ -27,7 +27,7 @@ def run_dummy_server():
     except Exception:
         pass
 
-# Ekran pastida doimiy turadigan tugmalar
+# Doimiy pastda turadigan menyu tugmalari
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("📥 Vazifa olish"), KeyboardButton("📤 Vazifa topshirish")]
@@ -37,8 +37,8 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
 
 # /start bosilganda
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Oldingi holatlarni to'liq tozalanadi
-    context.user_data.clear()
+    # Oldingi holatni tozalaymiz
+    context.user_data['waiting_for_homework'] = False
 
     if 'full_name' not in context.user_data:
         context.user_data['waiting_for_name'] = True
@@ -54,11 +54,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=MAIN_KEYBOARD
         )
 
-# Matnli xabarlar kelganda (Ism yoki Menyu tugmalari)
+# Matnli xabarlar kelganda
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # 1. Agar bot ism-familiya kutayotgan bo'lsa
+    # 1. Ism-familiya kiritilayotgan bo'lsa
     if context.user_data.get('waiting_for_name'):
         context.user_data['full_name'] = text
         context.user_data['waiting_for_name'] = False
@@ -92,7 +92,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-# Rasm yoki Fayl (PDF) kelganda ustozga yetkazish
+# O'quvchi vazifa (PDF/Rasm) yuborganda sizga yetkazish
 async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
     student_name = context.user_data.get('full_name', update.effective_user.full_name)
     username = update.effective_user.username
@@ -127,7 +127,7 @@ async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['waiting_for_homework'] = False
 
 if __name__ == '__main__':
-    # Soxta portni ishga tushirish (Render uchun)
+    # Soxta portni ishga tushirish
     threading.Thread(target=run_dummy_server, daemon=True).start()
 
     app = ApplicationBuilder().token(TOKEN).build()
