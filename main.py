@@ -12,41 +12,41 @@ from telegram.ext import (
     filters
 )
 
-# Logging (xatoliklarni kuzatish uchun)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# 1. Bot Tokeningiz
 TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"
+ADMIN_ID = 6420660423  # <--- Haqiqiy Telegram ID raqamingizni yozganingizga ishonch hosil qiling!
 
-# 2. Sizning Telegram ID raqamingiz (O'ZINGIZNING ID RAQAMINGIZNI YOZING!)
-ADMIN_ID = 6420660423  # <--- Shu yerga haqiqiy ID raqamingizni yozing!
+# UptimeRobot va Render uchun to'g'ri HTTP server (200 OK qaytaradi)
+class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot ishlamoqda!")
 
-# Render o'chib qolmasligi uchun soxta veb-server
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 8080))
-    class QuietHandler(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, format, *args):
-            pass
-    try:
-        with socketserver.TCPServer(("", port), QuietHandler) as httpd:
-            httpd.serve_forever()
-    except Exception:
+    def log_message(self, format, *args):
         pass
 
-# Asosiy menyu tugmalari
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    try:
+        server = socketserver.TCPServer(("", port), HealthCheckHandler)
+        server.serve_forever()
+    except Exception as e:
+        logging.error(f"Server xatosi: {e}")
+
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton("📥 Vazifa olish"), KeyboardButton("📤 Vazifa topshirish")]],
     resize_keyboard=True
 )
 
-# Sinfni tanlash tugmalari
 CLASS_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton("🏫 10.1-sinf"), KeyboardButton("🏫 10.2-sinf")],
      [KeyboardButton("⬅️ Ortga")]],
     resize_keyboard=True
 )
 
-# /start bosilganda
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
@@ -56,11 +56,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# Matnli xabarlar kelganda
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # 1. Ism-familiya kiritish bosqichi
     if 'full_name' not in context.user_data:
         context.user_data['full_name'] = text
         await update.message.reply_text(
@@ -70,7 +68,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 2. Asosiy menyu buyruqlari
     if text == "📥 Vazifa olish":
         await update.message.reply_text(
             "Qaysi sinf uchun vazifa olmoqchisiz? Tanlang:",
@@ -91,7 +88,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 3. Sinflar bo'yicha fayllarni yuborish
     if text == "🏫 10.1-sinf":
         file_path = "vazifa_10_1.pdf"
         if os.path.exists(file_path):
@@ -116,7 +112,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Hozircha 10.2-sinf uchun vazifa yuklanmagan.")
         return
 
-# O'quvchi uy vazifasini (rasm yoki fayl) yuborganda ustozga yetkazish
 async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
     student_name = context.user_data.get('full_name', update.effective_user.full_name)
     username = update.effective_user.username
@@ -147,7 +142,7 @@ async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Uy vazifangiz ustozga muvaffaqiyatli yetkazildi!", reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logging.error(f"Xatolik yuz berdi: {e}")
-        await update.message.reply_text("❌ Vazifani yuborishda xatolik yuz berdi. Qayta urinib ko'ring.")
+        await update.message.reply_text("❌ Vazifani yuborishda xatolik yuz berdi. ID to'g'riligini tekshiring.")
 
 if __name__ == '__main__':
     threading.Thread(target=run_dummy_server, daemon=True).start()
