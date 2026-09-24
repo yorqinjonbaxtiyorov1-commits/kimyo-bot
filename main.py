@@ -2,6 +2,7 @@ import os
 import http.server
 import socketserver
 import threading
+import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,11 +12,14 @@ from telegram.ext import (
     filters
 )
 
+# Logging (xatoliklarni kuzatish uchun)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
 # 1. Bot Tokeningiz
 TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"
 
-# 2. Sizning Telegram ID raqamingiz (Uy vazifalari shu ID ga keladi)
-ADMIN_ID = 6420660423  # <--- Shu yerga o'zingizning Telegram ID'ingizni yozing!
+# 2. Sizning Telegram ID raqamingiz (O'ZINGIZNING ID RAQAMINGIZNI YOZING!)
+ADMIN_ID = 6420660423  # <--- Shu yerga haqiqiy ID raqamingizni yozing!
 
 # Render o'chib qolmasligi uchun soxta veb-server
 def run_dummy_server():
@@ -109,10 +113,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text("❌ Hozircha 10.2-sinf mezonidagi vazifa yuklanmagan.")
+            await update.message.reply_text("❌ Hozircha 10.2-sinf uchun vazifa yuklanmagan.")
         return
 
-# O'quvchi uy vazifasini yuborganda sizga yetkazish
+# O'quvchi uy vazifasini (rasm yoki fayl) yuborganda ustozga yetkazish
 async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
     student_name = context.user_data.get('full_name', update.effective_user.full_name)
     username = update.effective_user.username
@@ -124,22 +128,26 @@ async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔗 **Profil:** {user_link}"
     )
 
-    if update.message.document:
-        await context.bot.send_document(
-            chat_id=ADMIN_ID,
-            document=update.message.document.file_id,
-            caption=caption_text,
-            parse_mode="Markdown"
-        )
-    elif update.message.photo:
-        await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=update.message.photo[-1].file_id,
-            caption=caption_text,
-            parse_mode="Markdown"
-        )
-
-    await update.message.reply_text("✅ Uy vazifangiz ustozga muvaffaqiyatli yetkazildi!", reply_markup=MAIN_KEYBOARD)
+    try:
+        if update.message.document:
+            await context.bot.send_document(
+                chat_id=ADMIN_ID,
+                document=update.message.document.file_id,
+                caption=caption_text,
+                parse_mode="Markdown"
+            )
+        elif update.message.photo:
+            await context.bot.send_photo(
+                chat_id=ADMIN_ID,
+                photo=update.message.photo[-1].file_id,
+                caption=caption_text,
+                parse_mode="Markdown"
+            )
+        
+        await update.message.reply_text("✅ Uy vazifangiz ustozga muvaffaqiyatli yetkazildi!", reply_markup=MAIN_KEYBOARD)
+    except Exception as e:
+        logging.error(f"Xatolik yuz berdi: {e}")
+        await update.message.reply_text("❌ Vazifani yuborishda xatolik yuz berdi. Qayta urinib ko'ring.")
 
 if __name__ == '__main__':
     threading.Thread(target=run_dummy_server, daemon=True).start()
@@ -148,7 +156,7 @@ if __name__ == '__main__':
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, receive_homework))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receive_homework))
 
     print("Bot ishga tushdi...")
     app.run_polling()
