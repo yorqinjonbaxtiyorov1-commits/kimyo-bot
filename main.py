@@ -1,8 +1,8 @@
 import os
-import http.server
-import socketserver
+import time
 import threading
 import logging
+import requests
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,33 +14,29 @@ from telegram.ext import (
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# Telegram Bot Token va Admin ID
 TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"
-ADMIN_ID = 6420660423  # <--- Haqiqiy Telegram ID raqamingizni yozganingizga ishonch hosil qiling!
+ADMIN_ID = 6420660423  # <--- Shu yerga o'zingizning Telegram ID raqamingizni yozing!
 
-# UptimeRobot va Render uchun to'g'ri HTTP server (200 OK qaytaradi)
-class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Bot ishlamoqda!")
+# Botni sleep rejimiga tushib qolmasligi uchun Avto-Ping funksiyasi
+def auto_ping():
+    time.sleep(10)
+    while True:
+        try:
+            # Telegram API'ga so'rov yuborish orqali botni faol ushlab turadi
+            requests.get(f"https://api.telegram.org/bot{TOKEN}/getMe", timeout=10)
+            logging.info("Auto-ping muvaffaqiyatli bajarildi!")
+        except Exception as e:
+            logging.error(f"Auto-ping xatosi: {e}")
+        time.sleep(300)  # Har 5 daqiqada (300 soniya) bir marta takrorlanadi
 
-    def log_message(self, format, *args):
-        pass
-
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 8080))
-    try:
-        server = socketserver.TCPServer(("", port), HealthCheckHandler)
-        server.serve_forever()
-    except Exception as e:
-        logging.error(f"Server xatosi: {e}")
-
+# Asosiy menyu tugmalari
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton("📥 Vazifa olish"), KeyboardButton("📤 Vazifa topshirish")]],
     resize_keyboard=True
 )
 
+# Sinfni tanlash tugmalari
 CLASS_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton("🏫 10.1-sinf"), KeyboardButton("🏫 10.2-sinf")],
      [KeyboardButton("⬅️ Ortga")]],
@@ -142,10 +138,11 @@ async def receive_homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Uy vazifangiz ustozga muvaffaqiyatli yetkazildi!", reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logging.error(f"Xatolik yuz berdi: {e}")
-        await update.message.reply_text("❌ Vazifani yuborishda xatolik yuz berdi. ID to'g'riligini tekshiring.")
+        await update.message.reply_text("❌ Vazifani yuborishda xatolik yuz berdi. ADMIN_ID to'g'riligini tekshiring.")
 
 if __name__ == '__main__':
-    threading.Thread(target=run_dummy_server, daemon=True).start()
+    # Auto-ping tizimini orqa fonda ishga tushirish
+    threading.Thread(target=auto_ping, daemon=True).start()
 
     app = ApplicationBuilder().token(TOKEN).build()
 
