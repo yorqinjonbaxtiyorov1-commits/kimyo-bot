@@ -1,174 +1,178 @@
-import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
+    CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
+    ConversationHandler,
     filters,
-    ConversationHandler
 )
+from telegram.error import TelegramError
 
-# Logging sozlamalari
+# Logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
 # ==================== SOZLAMALAR ====================
-BOT_TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"  # Telegram Bot Tokeningiz
-ADMIN_ID = 6420660423  # O'zingizning Telegram ID raqamingizni yozing (rasmlar shu IDga boradi)
-CHANNEL_USERNAME = "@bakht1yorov_y"  # O'zingizning kanalingiz usernamesi (masalan: @my_channel)
-# ===================================================
+TOKEN = "8927870856:AAE22Y0N-B9AzIAEqTM6dnvAPae0wc6je60"
+CHANNEL_ID = "@bakht1yorov_y"  # Masalan: @kimyo_kanali
+CHANNEL_LINK = "https://t.me/bakht1yorov_y"
 
-# Conversation statuslari
-WAITING_FOR_TASK = 1
+# O'zingizning Telegram ID raqamingiz (O'quvchilar vazifa yuborganda sizga keladi)
+ADMIN_ID = 6420660423
 
-async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Foydalanuvchi kanalga a'zo ekanligini tekshirish."""
-    if not CHANNEL_USERNAME or CHANNEL_USERNAME == "@ozingizning_kanalingiz":
-        return True
+# GitHub'dagi fayllaringizning to'g'ri (direct/raw) havolalari
+FILE_10_1 = "https://raw.githubusercontent.com/yorqinjonbaxtiyorov1-commits/kimyo-bot/main/10_1_sinf.pdf"
+FILE_10_2 = "https://raw.githubusercontent.com/yorqinjonbaxtiyorov1-commits/kimyo-bot/main/10_2_sinf.pdf"
+# =====================================================
+
+# Conversation holatlari
+GET_NAME = 1
+SEND_TASK = 2
+
+async def check_sub(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Kanalga obunani tekshirish"""
     try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        if member.status in ['creator', 'administrator', 'member']:
-            return True
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ['creator', 'administrator', 'member']
+    except TelegramError:
         return False
-    except Exception as e:
-        logging.error(f"A'zolikni tekshirishda xatolik: {e}")
-        # Agar bot kanalda admin bo'lmasa yoki xato bersa, bot to'xtab qolmasligi uchun True qaytaradi
-        return True
 
-def get_main_keyboard():
-    """Asosiy klaviatura tugmalari."""
-    keyboard = [
-        [KeyboardButton("📤 Vazifa olish"), KeyboardButton("📥 Vazifa topshirish")]
+def main_menu_keyboard():
+    """Bosh menyu tugmalari"""
+    reply_keyboard = [
+        ["📥 Vazifa olish", "📤 Vazifa topshirish"]
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/start buyrug'i uchun javob."""
-    user = update.effective_user
-    is_sub = await check_subscription(user.id, context)
+    user_id = update.effective_user.id
+    is_sub = await check_sub(user_id, context)
 
     if not is_sub:
-        channel_link = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
+        keyboard = [
+            [InlineKeyboardButton("📢 Kanalga a'zo bo'lish", url=CHANNEL_LINK)],
+            [InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_subscription")]
+        ]
         await update.message.reply_text(
-            f"🚀 Botdan foydalanish uchun avval rasmiy kanalimizga a'zo bo'ling:\n{channel_link}\n\n"
-            f"A'zo bo'lgach, qayta /start boshing."
+            " Botdan foydalanish uchun avval rasmiy kanalimizga a'zo bo'ling:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        return
+        return ConversationHandler.END
 
+    # Agar obuna bo'lgan bo'lsa, ism so'raymiz
     await update.message.reply_text(
-        f"Assalomu alaykum, {user.first_name}!\n"
-        f"Uyga vazifa botiga xush kelibsiz. Kerakli bo'limni tanlang:",
-        reply_markup=get_main_keyboard()
+        "Xush kelibsiz! Iltimos, ism va familiyangizni kiriting:",
+        reply_markup=ReplyKeyboardRemove()
     )
+    return GET_NAME
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Tugmalar va xabarlarni qayta ishlash."""
-    user = update.effective_user
-    text = update.message.text
+async def check_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    is_sub = await check_sub(user_id, context)
 
-    # Obunani tekshirish
-    is_sub = await check_subscription(user.id, context)
-    if not is_sub:
-        channel_link = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
-        await update.message.reply_text(
-            f"🚀 Botdan foydalanish uchun avval rasmiy kanalimizga a'zo bo'ling:\n{channel_link}"
-        )
-        return
-
-    if text == "📤 Vazifa olish":
-        await update.message.reply_text(
-            "📚 Bugungi uyga vazifangiz:\n\n"
-            "1. Darslikdagi 12-15 mavzularni o'qib chiqish.\n"
-            "2. 45, 46 va 47-masalalarni yechish.\n\n"
-            "Vazifani bajarib bo'lgach, '📥 Vazifa topshirish' tugmasi orqali rasm shaklida yuboring!"
-        )
-    elif text == "📥 Vazifa topshirish":
-        await update.message.reply_text(
-            "📝 Bajarilgan vazifangizning rasmini (yoki matn shaklida) yuboring:"
-        )
-        return WAITING_FOR_TASK
+    if is_sub:
+        await query.edit_message_text("✅ Obuna tasdiqlandi! Endi ism va familiyangizni kiriting:")
+        return GET_NAME
     else:
-        await update.message.reply_text(
-            "Iltimos, pastdagi tugmalardan birini tanlang.",
-            reply_markup=get_main_keyboard()
+        keyboard = [
+            [InlineKeyboardButton("📢 Kanalga a'zo bo'lish", url=CHANNEL_LINK)],
+            [InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_subscription")]
+        ]
+        await query.edit_message_text(
+            "❌ Siz hali kanalga a'zo bo'lmadingiz. Iltimos, avval a'zo bo'ling!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return ConversationHandler.END
 
-async def receive_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """O'quvchi yuborgan rasm yoki matnli vazifani qabul qilish va adminga yuborish."""
-    user = update.effective_user
-
-    # Agar foydalanuvchi rasm yuborgan bo'lsa
-    if update.message.photo:
-        photo_file_id = update.message.photo[-1].file_id
-        caption = (
-            f"📩 **Yangi vazifa keldi!**\n\n"
-            f"👤 O'quvchi: {user.full_name} (@{user.username or 'username_yoq'})\n"
-            f"🆔 ID: `{user.id}`\n"
-            f'💬 Izoh: {update.message.caption or "Izoh yoq"}'
-        )
-        # Adminga rasm yuborish
-        try:
-            await context.bot.send_photo(
-                chat_id=ADMIN_ID,
-                photo=photo_file_id,
-                caption=caption,
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logging.error(f"Adminga yuborishda xatolik: {e}")
-
-    # Agar foydalanuvchi matn yuborgan bo'lsa
-    elif update.message.text:
-        msg_text = (
-            f"📩 **Yangi vazifa (Matn):**\n\n"
-            f"👤 O'quvchi: {user.full_name} (@{user.username or 'username_yoq'})\n"
-            f"🆔 ID: `{user.id}`\n\n"
-            f"📝 **Vazifa:**\n{update.message.text}"
-        )
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=msg_text,
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logging.error(f"Adminga yuborishda xatolik: {e}")
-
+async def get_name_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.message.text
+    context.user_data['full_name'] = user_name
+    
     await update.message.reply_text(
-        "✅ Rahmat! Vazifangiz qabul qilindi va o'qituvchiga yuborildi.",
-        reply_markup=get_main_keyboard()
+        f"Rahmat, {user_name}! Kerakli bo'limni tanlang:",
+        reply_markup=main_menu_keyboard()
     )
     return ConversationHandler.END
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Amalni bekor qilish."""
-    await update.message.reply_text("Amal bekor qilindi.", reply_markup=get_main_keyboard())
+async def handle_text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "📥 Vazifa olish":
+        keyboard = [
+            [InlineKeyboardButton("📘 10.1-sinf", callback_data="class_10_1")],
+            [InlineKeyboardButton("📙 10.2-sinf", callback_data="class_10_2")],
+            [InlineKeyboardButton("⬅️ Ortga", callback_data="back_to_main")]
+        ]
+        await update.message.reply_text("Sinfni tanlang:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif text == "📤 Vazifa topshirish":
+        await update.message.reply_text(
+            "Vazifangizni rasm yoki PDF fayl ko'rinishida yuboring:"
+        )
+        return SEND_TASK
+
+async def file_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "class_10_1":
+        await query.message.reply_document(document=FILE_10_1, caption="10.1-sinf uchun vazifa")
+    elif query.data == "class_10_2":
+        await query.message.reply_document(document=FILE_10_2, caption="10.2-sinf uchun vazifa")
+    elif query.data == "back_to_main":
+        await query.message.delete()
+        await query.message.reply_text("Bosh menyu:", reply_markup=main_menu_keyboard())
+
+async def receive_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    full_name = context.user_data.get('full_name', 'Ismi kiritilmagan')
+    caption_text = f"📩 **Yangi vazifa keldi!**\n\n👤 **O'quvchi:** {full_name}\n🔗 **Username:** @{user.username if user.username else 'Yo'q'}\n🆔 **ID:** {user.id}"
+
+    # Agar rasm yuborsa
+    if update.message.photo:
+        photo_file = update.message.photo[-1].file_id
+        await context.bot.send_photo(chat_id=ADMIN_ID, photo=photo_file, caption=caption_text, parse_mode="Markdown")
+        await update.message.reply_text("✅ Vazifangiz o'qituvchiga muvaffaqiyatli yuborildi!", reply_markup=main_menu_keyboard())
+    # Agar PDF yoki boshqa fayl yuborsa
+    elif update.message.document:
+        doc_file = update.message.document.file_id
+        await context.bot.send_document(chat_id=ADMIN_ID, document=doc_file, caption=caption_text, parse_mode="Markdown")
+        await update.message.reply_text("✅ Vazifangiz o'qituvchiga muvaffaqiyatli yuborildi!", reply_markup=main_menu_keyboard())
+    else:
+        await update.message.reply_text("Iltimos, faqat rasm yoki PDF fayl yuboring!")
+        return SEND_TASK
+
     return ConversationHandler.END
 
 def main():
-    """Botni ishga tushirish."""
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = Application.builder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^📥 Vazifa topshirish$"), handle_message)],
+        entry_points=[
+            CommandHandler("start", start),
+            CallbackQueryHandler(check_sub_callback, pattern="^check_subscription$"),
+            MessageHandler(filters.Regex("^(📤 Vazifa topshirish)$"), handle_text_buttons)
+        ],
         states={
-            WAITING_FOR_TASK: [
-                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, receive_task)
-            ],
+            GET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name_handler)],
+            SEND_TASK: [MessageHandler(filters.PHOTO | filters.Document.ALL, receive_task)]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[CommandHandler("start", start)]
     )
 
-    app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Regex("^(📥 Vazifa olish)$"), handle_text_buttons))
+    app.add_handler(CallbackQueryHandler(file_callback_handler))
 
-    print("Bot muvaffaqiyatli ishga tushdi...")
+    print("Bot ishga tushdi...")
     app.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
