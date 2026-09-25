@@ -108,7 +108,7 @@ async def receive_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📩 **Yangi vazifa keldi!**\n\n"
             f"👤 O'quvchi: {user.full_name} (@{user.username or 'username_yoq'})\n"
             f"🆔 ID: `{user.id}`\n"
-            f"💬 Izoh: {update.message.caption or 'Izoh yo'q'}"
+            f'💬 Izoh: {update.message.caption or "Izoh yoq"}'
         )
         # Adminga rasm yuborish
         try:
